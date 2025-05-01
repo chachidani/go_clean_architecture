@@ -4,7 +4,7 @@ import (
 	"go_clean_architecture/bootstrap"
 	"go_clean_architecture/delivery/controller"
 	"go_clean_architecture/domain"
-	"go_clean_architecture/middleware"
+	"go_clean_architecture/Infrastructure/middleware"
 	"go_clean_architecture/repository"
 	"go_clean_architecture/usecases"
 	"time"
@@ -25,7 +25,7 @@ func Setup(env *bootstrap.Env, timeout time.Duration, db mongo.Database, gin *gi
 }
 
 func NewSignUpRoutes(router *gin.RouterGroup, env *bootstrap.Env, timeout time.Duration, db mongo.Database) {
-	sr := repository.NewSignUpRepository(db, domain.CollectionUser)
+	sr := repository.NewSignUpRepository(db, domain.CollectionUser, middleware.NewPasswordService())
 	sc := &controller.SignUpController{
 		SignUpUsecase: usecases.NewSignUpUsecase(sr, timeout),
 	}
@@ -33,7 +33,7 @@ func NewSignUpRoutes(router *gin.RouterGroup, env *bootstrap.Env, timeout time.D
 }
 
 func NewLoginRoutes(router *gin.RouterGroup, env *bootstrap.Env, timeout time.Duration, db mongo.Database) {
-	lr := repository.NewLoginRepository(db, domain.CollectionUser)
+	lr := repository.NewLoginRepository(db, domain.CollectionUser, middleware.NewPasswordService(), middleware.NewJWTService(env.AccessTokenSecret))
 	lc := &controller.LoginController{
 		LoginUsecase: usecases.NewLoginUsecase(lr, timeout),
 	}
@@ -41,7 +41,7 @@ func NewLoginRoutes(router *gin.RouterGroup, env *bootstrap.Env, timeout time.Du
 }
 
 func NewRefreshTokenRoutes(router *gin.RouterGroup, env *bootstrap.Env, timeout time.Duration, db mongo.Database) {
-	rr := repository.NewRefreshTokenRepository(db, domain.CollectionUser)
+	rr := repository.NewRefreshTokenRepository(db, domain.CollectionUser, middleware.NewJWTService(env.AccessTokenSecret))
 	rc := &controller.RefreshTokenController{
 		RefreshTokenUsecase: usecases.NewRefreshTokenUsecase(rr, timeout),
 	}

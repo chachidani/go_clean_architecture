@@ -3,41 +3,49 @@ package repository
 import (
 	"context"
 	"fmt"
+	"go_clean_architecture/Infrastructure/middleware"
 	"go_clean_architecture/domain"
-	"time"
 
-	"github.com/golang-jwt/jwt"
 	"go.mongodb.org/mongo-driver/bson"
 	"go.mongodb.org/mongo-driver/mongo"
-	"golang.org/x/crypto/bcrypt"
 )
-
-var secretKey = []byte("your-secret-key-here")
 
 // signup repository
 
 type signUpRepository struct {
-	database   mongo.Database
-	collection string
+	database        mongo.Database
+	collection      string
+	passwordService *middleware.PasswordService
 }
 
-func NewSignUpRepository(database mongo.Database, collection string) domain.SignUpRepository {
+func NewSignUpRepository(database mongo.Database, collection string, passwordService *middleware.PasswordService) domain.SignUpRepository {
 	return &signUpRepository{
-		database:   database,
-		collection: collection,
+		database:        database,
+		collection:      collection,
+		passwordService: passwordService,
 	}
 }
 
 // SignUp implements domain.SignUpRepository.
 func (s *signUpRepository) SignUp(c context.Context, signUpRequest domain.SignUpRequest) (domain.SignUpResponse, error) {
-	hashedPassword, err := bcrypt.GenerateFromPassword([]byte(signUpRequest.Password), bcrypt.DefaultCost)
+	// Check if user already exists
+	collection := s.database.Collection(s.collection)
+	var existingUser domain.SignUpRequest
+	err := collection.FindOne(c, bson.M{"username": signUpRequest.Username}).Decode(&existingUser)
+	if err == nil {
+		return domain.SignUpResponse{}, fmt.Errorf("user with username %s already exists", signUpRequest.Username)
+	}
+	if err != mongo.ErrNoDocuments {
+		return domain.SignUpResponse{}, err
+	}
+
+	hashedPassword, err := s.passwordService.HashPassword(signUpRequest.Password)
 	if err != nil {
 		return domain.SignUpResponse{}, err
 	}
 
-	signUpRequest.Password = string(hashedPassword)
+	signUpRequest.Password = hashedPassword
 
-	collection := s.database.Collection(s.collection)
 	_, err = collection.InsertOne(c, signUpRequest)
 	if err != nil {
 		return domain.SignUpResponse{}, err
@@ -50,14 +58,18 @@ func (s *signUpRepository) SignUp(c context.Context, signUpRequest domain.SignUp
 // login repository
 
 type loginRepository struct {
-	database   mongo.Database
-	collection string
+	database        mongo.Database
+	collection      string
+	passwordService *middleware.PasswordService
+	jwtService      *middleware.JWTService
 }
 
-func NewLoginRepository(database mongo.Database, collection string) domain.LoginRepository {
+func NewLoginRepository(database mongo.Database, collection string, passwordService *middleware.PasswordService, jwtService *middleware.JWTService) domain.LoginRepository {
 	return &loginRepository{
-		database:   database,
-		collection: collection,
+		database:        database,
+		collection:      collection,
+		passwordService: passwordService,
+		jwtService:      jwtService,
 	}
 }
 
@@ -71,30 +83,15 @@ func (l *loginRepository) Login(c context.Context, loginRequest domain.LoginRequ
 		return domain.LoginResponse{}, err
 	}
 
-	if err := bcrypt.CompareHashAndPassword([]byte(signUpRequest.Password), []byte(loginRequest.Password)); err != nil {
+	if err := l.passwordService.VerifyPassword(signUpRequest.Password, loginRequest.Password); err != nil {
 		return domain.LoginResponse{}, err
 	}
 
-	// Create token with claims
-	claims := jwt.MapClaims{
-		"username": signUpRequest.Username,
-		"role":     signUpRequest.Role,
-		"exp":      time.Now().Add(time.Hour * 24).Unix(),
-	}
-
-	token := jwt.NewWithClaims(jwt.SigningMethodHS256, claims)
-
-	// Log the claims before signing
-	fmt.Printf("Generating token with claims: %+v\n", claims)
-
-	tokenString, err := token.SignedString(secretKey)
+	tokenString, err := l.jwtService.GenerateToken(signUpRequest.Username, signUpRequest.Role)
 	if err != nil {
-		fmt.Printf("Error signing token: %v\n", err)
+		fmt.Printf("Error generating token: %v\n", err)
 		return domain.LoginResponse{}, err
 	}
-
-	// Log the generated token
-	fmt.Printf("Generated token: %s\n", tokenString)
 
 	return domain.LoginResponse{
 		Message: "Login successful as " + signUpRequest.Role,
@@ -107,12 +104,14 @@ func (l *loginRepository) Login(c context.Context, loginRequest domain.LoginRequ
 type refreshTokenRepository struct {
 	database   mongo.Database
 	collection string
+	jwtService *middleware.JWTService
 }
 
-func NewRefreshTokenRepository(database mongo.Database, collection string) domain.RefreshTokenRepository {
+func NewRefreshTokenRepository(database mongo.Database, collection string, jwtService *middleware.JWTService) domain.RefreshTokenRepository {
 	return &refreshTokenRepository{
 		database:   database,
 		collection: collection,
+		jwtService: jwtService,
 	}
 }
 
@@ -126,13 +125,7 @@ func (r *refreshTokenRepository) RefreshToken(c context.Context, refreshTokenReq
 		return domain.RefreshTokenResponse{}, err
 	}
 
-	token := jwt.NewWithClaims(jwt.SigningMethodHS256, jwt.MapClaims{
-		"username": signUpRequest.Username,
-		"role":     signUpRequest.Role,
-		"exp":      time.Now().Add(time.Hour * 24).Unix(),
-	})
-
-	tokenString, err := token.SignedString(secretKey)
+	tokenString, err := r.jwtService.GenerateToken(signUpRequest.Username, signUpRequest.Role)
 	if err != nil {
 		return domain.RefreshTokenResponse{}, err
 	}
