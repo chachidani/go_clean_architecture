@@ -19,10 +19,12 @@ type SignUpResponse struct {
 
 type SignUpRepository interface {
 	SignUp(c context.Context, signUpRequest SignUpRequest) (SignUpResponse, error)
+	GetUser(c context.Context) ([]SignUpRequest, error)
 }
 
 type SignUpUsecase interface {
 	SignUp(c context.Context, signUpRequest SignUpRequest) (SignUpResponse, error)
+	GetUser(c context.Context) ([]SignUpRequest, error)
 }
 
 // login

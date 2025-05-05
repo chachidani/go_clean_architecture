@@ -43,11 +43,11 @@ func main() {
 	if err != nil {
 		log.Fatalf("Failed to ping MongoDB: %v", err)
 	}
-
+	fmt.Println("Connected to MongoDB")
 	// Get database instance with default name if not set
 	dbName := env.DBName
 	if dbName == "" {
-		dbName = "go_clean_architecture"
+		dbName = "task_manager"
 	}
 	db := client.Database(dbName)
 

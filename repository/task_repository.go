@@ -31,8 +31,11 @@ func (t *taskRepository) CreateTask(c context.Context, task domain.Task) error {
 }
 
 // DeleteTask implements domain.TaskRepository.
-func (t *taskRepository) DeleteTask(c context.Context, id primitive.ObjectID) error {
+func (t *taskRepository) DeleteTask(c context.Context, id primitive.ObjectID, userRole string) error {
 	collection := t.database.Collection(t.collection)
+	if userRole != "admin" {
+		return fmt.Errorf("unauthorized")
+	}
 	_, err := collection.DeleteOne(c, bson.M{"_id": id})
 	return err
 }

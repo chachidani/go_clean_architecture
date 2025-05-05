@@ -23,7 +23,7 @@ type TaskRepository interface {
 	GetTask( c context.Context , id primitive.ObjectID) (Task, error)
 	GetAllTasks( c context.Context) ([]Task, error)
 	UpdateTask( c context.Context , id primitive.ObjectID, task Task) (Task, error)
-	DeleteTask( c context.Context , id primitive.ObjectID) error
+	DeleteTask( c context.Context , id primitive.ObjectID , userRole string) error
 }
 
 type TaskUsecase interface {
@@ -31,6 +31,6 @@ type TaskUsecase interface {
 	GetTask( c context.Context , id primitive.ObjectID) (Task, error)
 	GetAllTasks( c context.Context) ([]Task, error)
 	UpdateTask( c context.Context , id primitive.ObjectID, task Task) (Task, error)
-	DeleteTask( c context.Context , id primitive.ObjectID) error
+	DeleteTask( c context.Context , id primitive.ObjectID , userRole string) error
 }
 

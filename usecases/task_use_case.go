@@ -29,11 +29,11 @@ func (t *taskUsecase) CreateTask(c context.Context, task domain.Task) error {
 }
 
 // DeleteTask implements domain.TaskUsecase.
-func (t *taskUsecase) DeleteTask(c context.Context, id primitive.ObjectID) error {
+func (t *taskUsecase) DeleteTask(c context.Context, id primitive.ObjectID, userRole string) error {
 	ctx, cancel := context.WithTimeout(c, t.ContextTimeout)
 	defer cancel()
 
-	return t.taskRepository.DeleteTask(ctx, id)
+	return t.taskRepository.DeleteTask(ctx, id, userRole)
 }
 
 // GetAllTasks implements domain.TaskUsecase.

@@ -94,7 +94,8 @@ func (tc *TaskController) DeleteTask(c *gin.Context) {
 		return
 	}
 
-	err = tc.TaskUsecase.DeleteTask(c, objectId)
+	userRole := c.GetHeader("Role")
+	err = tc.TaskUsecase.DeleteTask(c, objectId, userRole)
 	if err != nil {
 		c.IndentedJSON(http.StatusInternalServerError, domain.ErrorResponse{Message: err.Error()})
 		return

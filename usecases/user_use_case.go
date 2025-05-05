@@ -28,6 +28,14 @@ func (s *signUpUsecase) SignUp(c context.Context, signUpRequest domain.SignUpReq
 	return s.signUpRepository.SignUp(ctx, signUpRequest)
 }
 
+func (s *signUpUsecase) GetUser(c context.Context) ([]domain.SignUpRequest, error) {
+	ctx, cancel := context.WithTimeout(c, s.ContextTimeout)
+	defer cancel()
+
+	return s.signUpRepository.GetUser(ctx)
+}
+
+
 // loginusecase
 
 type loginUsecase struct {
@@ -50,6 +58,9 @@ func (l *loginUsecase) Login(c context.Context, loginRequest domain.LoginRequest
 
 	return l.loginRepository.Login(ctx, loginRequest)
 }
+
+
+
 
 // refresh token usecase
 

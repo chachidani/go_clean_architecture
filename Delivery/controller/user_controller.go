@@ -49,6 +49,19 @@ func (uc *LoginController) Login(c *gin.Context) {
 	c.IndentedJSON(http.StatusOK, loginResponse)	
 }
 
+// get user controller
+
+func (uc *SignUpController) GetUser(c *gin.Context) {
+	var users []domain.SignUpRequest
+	users, err := uc.SignUpUsecase.GetUser(c)
+	if err != nil {
+		c.IndentedJSON(http.StatusInternalServerError, domain.ErrorResponse{Message: err.Error()})
+		return
+	}
+
+	c.IndentedJSON(http.StatusOK, users)
+}
+
 // refresh token controller
 
 type RefreshTokenController struct {
@@ -70,6 +83,8 @@ func (uc *RefreshTokenController) RefreshToken(c *gin.Context) {
 
 	c.IndentedJSON(http.StatusOK, refreshTokenResponse)
 }
+
+
 
 
 

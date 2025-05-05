@@ -6,50 +6,52 @@ import (
 	"strings"
 
 	"github.com/gin-gonic/gin"
-	"github.com/golang-jwt/jwt"
 )
 
-var secretKey = []byte("your-secret-key-here")
+var jwtService *JWTService
+
+func SetJWTService(service *JWTService) {
+	jwtService = service
+}
 
 func AuthMiddleware() gin.HandlerFunc {
 	return func(c *gin.Context) {
-		tokenString := c.GetHeader("Authorization")
-		if tokenString == "" {
-			c.JSON(http.StatusUnauthorized, gin.H{"error": "Missing token"})
+		authHeader := c.GetHeader("Authorization")
+		if authHeader == "" {
+			c.JSON(http.StatusUnauthorized, gin.H{"error": "Authorization header is required"})
 			c.Abort()
 			return
 		}
-		tokenString = strings.TrimPrefix(tokenString, "Bearer ")
 
-		// Log the token for debugging
-		fmt.Printf("Token being validated: %s\n", tokenString)
+		if !strings.HasPrefix(authHeader, "Bearer ") {
+			c.JSON(http.StatusUnauthorized, gin.H{"error": "Invalid authorization header format"})
+			c.Abort()
+			return
+		}
 
-		token, err := jwt.Parse(tokenString, func(token *jwt.Token) (interface{}, error) {
-			// Log the signing method
-			fmt.Printf("Token signing method: %v\n", token.Method)
-			return secretKey, nil
-		})
+		tokenString := strings.TrimPrefix(authHeader, "Bearer ")
 
+		if jwtService == nil {
+			c.JSON(http.StatusInternalServerError, gin.H{"error": "JWT service not initialized"})
+			c.Abort()
+			return
+		}
+
+		// Validate token using JWT service
+		claims, err := jwtService.ValidateToken(tokenString)
 		if err != nil {
 			fmt.Printf("Token validation error: %v\n", err)
-			c.JSON(http.StatusUnauthorized, gin.H{"error": fmt.Sprintf("Invalid token: %v", err)})
+			c.JSON(http.StatusUnauthorized, gin.H{"error": "Invalid token"})
 			c.Abort()
 			return
 		}
 
-		if !token.Valid {
-			fmt.Println("Token is not valid")
-			c.JSON(http.StatusUnauthorized, gin.H{"error": "Token is not valid"})
-			c.Abort()
-			return
-		}
-
-		// Log the claims
-		claims := token.Claims.(jwt.MapClaims)
-		fmt.Printf("Token claims: %+v\n", claims)
-
+		// Set user information in context
 		c.Set("username", claims["username"])
 		c.Set("role", claims["role"])
+
 		c.Next()
 	}
 }
+
+//

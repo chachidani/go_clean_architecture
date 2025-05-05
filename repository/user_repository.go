@@ -30,6 +30,9 @@ func NewSignUpRepository(database mongo.Database, collection string, passwordSer
 func (s *signUpRepository) SignUp(c context.Context, signUpRequest domain.SignUpRequest) (domain.SignUpResponse, error) {
 	// Check if user already exists
 	collection := s.database.Collection(s.collection)
+	fmt.Printf("Attempting to register user in collection: %s\n", s.collection)
+	fmt.Printf("Database name: %s\n", s.database.Name())
+
 	var existingUser domain.SignUpRequest
 	err := collection.FindOne(c, bson.M{"username": signUpRequest.Username}).Decode(&existingUser)
 	if err == nil {
@@ -46,13 +49,35 @@ func (s *signUpRepository) SignUp(c context.Context, signUpRequest domain.SignUp
 
 	signUpRequest.Password = hashedPassword
 
-	_, err = collection.InsertOne(c, signUpRequest)
+	result, err := collection.InsertOne(c, signUpRequest)
 	if err != nil {
+		fmt.Printf("Error inserting user: %v\n", err)
 		return domain.SignUpResponse{}, err
 	}
+
+	fmt.Printf("Successfully inserted user with ID: %v\n", result.InsertedID)
+	fmt.Printf("User details: %+v\n", signUpRequest)
+
 	return domain.SignUpResponse{
 		Message: "Signup successful",
 	}, nil
+}
+
+// GetUser implements domain.SignUpRepository.
+func (s *signUpRepository) GetUser(c context.Context) ([]domain.SignUpRequest, error) {
+	collection := s.database.Collection(s.collection)
+	cursor, err := collection.Find(c, bson.M{})
+	if err != nil {
+		return nil, err
+	}
+	defer cursor.Close(c)
+
+	var users []domain.SignUpRequest
+	if err = cursor.All(c, &users); err != nil {
+		return nil, err
+	}
+
+	return users, nil
 }
 
 // login repository
@@ -80,17 +105,19 @@ func (l *loginRepository) Login(c context.Context, loginRequest domain.LoginRequ
 	var signUpRequest domain.SignUpRequest
 	err := collection.FindOne(c, bson.M{"username": loginRequest.Username}).Decode(&signUpRequest)
 	if err != nil {
-		return domain.LoginResponse{}, err
+		if err == mongo.ErrNoDocuments {
+			return domain.LoginResponse{}, fmt.Errorf("user with username %s does not exist", loginRequest.Username)
+		}
+		return domain.LoginResponse{}, fmt.Errorf("error finding user: %v", err)
 	}
 
 	if err := l.passwordService.VerifyPassword(signUpRequest.Password, loginRequest.Password); err != nil {
-		return domain.LoginResponse{}, err
+		return domain.LoginResponse{}, fmt.Errorf("invalid password")
 	}
 
 	tokenString, err := l.jwtService.GenerateToken(signUpRequest.Username, signUpRequest.Role)
 	if err != nil {
-		fmt.Printf("Error generating token: %v\n", err)
-		return domain.LoginResponse{}, err
+		return domain.LoginResponse{}, fmt.Errorf("error generating token: %v", err)
 	}
 
 	return domain.LoginResponse{
@@ -98,6 +125,8 @@ func (l *loginRepository) Login(c context.Context, loginRequest domain.LoginRequ
 		Token:   tokenString,
 	}, nil
 }
+
+// get user repository
 
 // refresh token repository
 
